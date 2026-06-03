@@ -1,0 +1,537 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("WORKER")
+  isActive  Boolean  @default(true)
+  phone     String?
+  position  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts           Shift[]
+  productionRuns   ProductionRun[]
+  printJobs        PrintJob[]
+  recyclingBatches RecyclingBatch[]
+  cuttingJobs      CuttingJob[]
+  activityLogs     ActivityLog[]
+  qualityChecks    QualityCheck[]
+
+  @@map("users")
+}
+
+model RawMaterial {
+  id            String   @id @default(cuid())
+  name          String
+  code          String   @unique
+  type          String
+  unit          String   @default("kg")
+  currentStock  Float    @default(0)
+  minStockLevel Float    @default(100)
+  unitCost      Float    @default(0)
+  supplier      String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchases          Purchase[]
+  productionRawUsage ProductionRawUsage[]
+  recyclingOutputs   RecyclingBatch[]
+  printInkUsage      PrintInkUsage[]
+  stockAdjustments   StockAdjustment[]
+  costIngredients    CostRecipeIngredient[]
+
+  @@map("raw_materials")
+}
+
+model Purchase {
+  id            String   @id @default(cuid())
+  rawMaterialId String
+  quantity      Float
+  unitCost      Float
+  totalCost     Float
+  supplier      String
+  invoiceNumber String?
+  purchaseDate  DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("purchases")
+}
+
+model StockAdjustment {
+  id             String   @id @default(cuid())
+  rawMaterialId  String
+  adjustmentType String
+  quantity       Float
+  reason         String
+  previousStock  Float
+  newStock       Float
+  createdAt      DateTime @default(now())
+
+  rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("stock_adjustments")
+}
+
+model Machine {
+  id            String   @id @default(cuid())
+  name          String
+  code          String   @unique
+  type          String
+  powerKw       Float
+  capacityKgHr  Float?
+  manufacturer  String?
+  model         String?
+  serialNumber  String?
+  installDate   DateTime?
+  status        String   @default("ACTIVE")
+  location      String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  maintenanceLogs  MaintenanceLog[]
+  productionRuns   ProductionRun[]
+  printJobs        PrintJob[]
+  recyclingBatches RecyclingBatch[]
+  cuttingJobs      CuttingJob[]
+
+  @@map("machines")
+}
+
+model MaintenanceLog {
+  id              String    @id @default(cuid())
+  machineId       String
+  type            String
+  description     String
+  performedBy     String
+  cost            Float?
+  downtimeHours   Float?
+  scheduledDate   DateTime?
+  completedDate   DateTime?
+  nextServiceDate DateTime?
+  status          String    @default("COMPLETED")
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  machine Machine @relation(fields: [machineId], references: [id])
+
+  @@map("maintenance_logs")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  taxId       String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders CustomerOrder[]
+
+  @@map("customers")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique
+  type            String
+  unit            String   @default("ədəd")
+  widthMm         Float?
+  lengthMm        Float?
+  thicknessMicron Float?
+  weightGram      Float?
+  colorSpec       String?
+  isActive        Boolean  @default(true)
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orderItems       CustomerOrderItem[]
+  productionOrders ProductionOrder[]
+  costRecipes      CostRecipe[]
+  costCalculations CostCalculation[]
+
+  @@map("products")
+}
+
+model CustomerOrder {
+  id            String    @id @default(cuid())
+  orderNumber   String    @unique
+  customerId    String
+  status        String    @default("PENDING")
+  orderDate     DateTime  @default(now())
+  dueDate       DateTime?
+  deliveredDate DateTime?
+  totalAmount   Float?
+  paidAmount    Float     @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  items            CustomerOrderItem[]
+  productionOrders ProductionOrder[]
+  invoices         Invoice[]
+
+  @@map("customer_orders")
+}
+
+model CustomerOrderItem {
+  id              String @id @default(cuid())
+  customerOrderId String
+  productId       String
+  quantity        Float
+  unit            String
+  unitPrice       Float
+  totalPrice      Float
+  deliveredQty    Float  @default(0)
+
+  customerOrder CustomerOrder @relation(fields: [customerOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@map("customer_order_items")
+}
+
+model ProductionOrder {
+  id               String    @id @default(cuid())
+  orderNumber      String    @unique
+  productId        String
+  customerOrderId  String?
+  plannedQty       Float
+  unit             String
+  status           String    @default("PLANNED")
+  priority         String    @default("NORMAL")
+  plannedStartDate DateTime?
+  plannedEndDate   DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  product       Product        @relation(fields: [productId], references: [id])
+  customerOrder CustomerOrder? @relation(fields: [customerOrderId], references: [id])
+  productionRuns ProductionRun[]
+
+  @@map("production_orders")
+}
+
+model ProductionRun {
+  id                  String    @id @default(cuid())
+  runNumber           String    @unique
+  productionOrderId   String
+  machineId           String
+  operatorId          String
+  startTime           DateTime?
+  endTime             DateTime?
+  plannedQtyKg        Float
+  actualQtyKg         Float?
+  wasteKg             Float     @default(0)
+  filmThicknessMicron Float?
+  filmWidthMm         Float?
+  speedMPerMin        Float?
+  temperatureC        Float?
+  status              String    @default("PENDING")
+  qualityGrade        String?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  productionOrder  ProductionOrder      @relation(fields: [productionOrderId], references: [id])
+  machine          Machine              @relation(fields: [machineId], references: [id])
+  operator         User                 @relation(fields: [operatorId], references: [id])
+  rawMaterialUsage ProductionRawUsage[]
+  outputRolls      FilmRoll[]
+  qualityChecks    QualityCheck[]
+
+  @@map("production_runs")
+}
+
+model ProductionRawUsage {
+  id              String   @id @default(cuid())
+  productionRunId String
+  rawMaterialId   String
+  plannedQty      Float
+  actualQty       Float?
+  unit            String   @default("kg")
+  createdAt       DateTime @default(now())
+
+  productionRun ProductionRun @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  rawMaterial   RawMaterial   @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("production_raw_usage")
+}
+
+model FilmRoll {
+  id              String   @id @default(cuid())
+  rollNumber      String   @unique
+  productionRunId String
+  weightKg        Float
+  widthMm         Float
+  lengthM         Float?
+  thicknessMicron Float?
+  status          String   @default("AVAILABLE")
+  location        String?
+  qrCode          String?
+  createdAt       DateTime @default(now())
+
+  productionRun ProductionRun    @relation(fields: [productionRunId], references: [id])
+  printJobs     PrintJobRoll[]
+  cuttingJobs   CuttingJobRoll[]
+
+  @@map("film_rolls")
+}
+
+model QualityCheck {
+  id              String    @id @default(cuid())
+  productionRunId String
+  checkerId       String
+  filmThickness   Float?
+  hasDefects      Boolean   @default(false)
+  defectType      String?
+  grade           String?
+  notes           String?
+  checkedAt       DateTime  @default(now())
+
+  productionRun ProductionRun @relation(fields: [productionRunId], references: [id])
+  checker       User          @relation(fields: [checkerId], references: [id])
+
+  @@map("quality_checks")
+}
+
+model RecyclingBatch {
+  id               String    @id @default(cuid())
+  batchNumber      String    @unique
+  machineId        String
+  operatorId       String
+  inputType        String
+  inputWeightKg    Float
+  outputWeightKg   Float?
+  outputMaterialId String?
+  efficiency       Float?
+  startTime        DateTime?
+  endTime          DateTime?
+  status           String    @default("PENDING")
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  machine        Machine      @relation(fields: [machineId], references: [id])
+  operator       User         @relation(fields: [operatorId], references: [id])
+  outputMaterial RawMaterial? @relation(fields: [outputMaterialId], references: [id])
+
+  @@map("recycling_batches")
+}
+
+model PrintJob {
+  id           String    @id @default(cuid())
+  jobNumber    String    @unique
+  machineId    String
+  operatorId   String
+  designName   String
+  designFile   String?
+  colorCount   Int       @default(1)
+  status       String    @default("PENDING")
+  startTime    DateTime?
+  endTime      DateTime?
+  totalLengthM Float?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  machine  Machine         @relation(fields: [machineId], references: [id])
+  operator User            @relation(fields: [operatorId], references: [id])
+  rolls    PrintJobRoll[]
+  inkUsage PrintInkUsage[]
+
+  @@map("print_jobs")
+}
+
+model PrintJobRoll {
+  id         String @id @default(cuid())
+  printJobId String
+  filmRollId String
+
+  printJob PrintJob @relation(fields: [printJobId], references: [id], onDelete: Cascade)
+  filmRoll FilmRoll @relation(fields: [filmRollId], references: [id])
+
+  @@unique([printJobId, filmRollId])
+  @@map("print_job_rolls")
+}
+
+model PrintInkUsage {
+  id            String   @id @default(cuid())
+  printJobId    String
+  rawMaterialId String
+  quantityKg    Float
+  createdAt     DateTime @default(now())
+
+  printJob    PrintJob    @relation(fields: [printJobId], references: [id], onDelete: Cascade)
+  rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("print_ink_usage")
+}
+
+model CuttingJob {
+  id          String    @id @default(cuid())
+  jobNumber   String    @unique
+  machineId   String
+  operatorId  String
+  bagWidthMm  Float?
+  bagLengthMm Float?
+  outputQty   Float?
+  wasteKg     Float     @default(0)
+  status      String    @default("PENDING")
+  startTime   DateTime?
+  endTime     DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  machine  Machine          @relation(fields: [machineId], references: [id])
+  operator User             @relation(fields: [operatorId], references: [id])
+  rolls    CuttingJobRoll[]
+
+  @@map("cutting_jobs")
+}
+
+model CuttingJobRoll {
+  id           String @id @default(cuid())
+  cuttingJobId String
+  filmRollId   String
+
+  cuttingJob CuttingJob @relation(fields: [cuttingJobId], references: [id], onDelete: Cascade)
+  filmRoll   FilmRoll   @relation(fields: [filmRollId], references: [id])
+
+  @@unique([cuttingJobId, filmRollId])
+  @@map("cutting_job_rolls")
+}
+
+model CostRecipe {
+  id             String   @id @default(cuid())
+  productId      String
+  name           String
+  isDefault      Boolean  @default(false)
+  energyKwhPerKg Float    @default(0)
+  laborCostPerKg Float    @default(0)
+  overheadPerKg  Float    @default(0)
+  wasteFactor    Float    @default(0.05)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product     Product                @relation(fields: [productId], references: [id])
+  ingredients CostRecipeIngredient[]
+
+  @@map("cost_recipes")
+}
+
+model CostRecipeIngredient {
+  id            String @id @default(cuid())
+  costRecipeId  String
+  rawMaterialId String
+  qtyPerKg      Float
+
+  costRecipe  CostRecipe  @relation(fields: [costRecipeId], references: [id], onDelete: Cascade)
+  rawMaterial RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  @@map("cost_recipe_ingredients")
+}
+
+model CostCalculation {
+  id                String   @id @default(cuid())
+  productId         String
+  costRecipeId      String?
+  calculationDate   DateTime @default(now())
+  quantityKg        Float
+  rawMaterialCost   Float
+  energyCost        Float
+  laborCost         Float
+  overheadCost      Float
+  wasteCost         Float
+  totalCost         Float
+  costPerKg         Float
+  costPerUnit       Float?
+  energyPricePerKwh Float
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("cost_calculations")
+}
+
+model Shift {
+  id          String    @id @default(cuid())
+  userId      String
+  shiftType   String
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime?
+  hoursWorked Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("shifts")
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  invoiceNumber   String    @unique
+  customerOrderId String
+  totalAmount     Float
+  paidAmount      Float     @default(0)
+  status          String    @default("PENDING")
+  dueDate         DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customerOrder CustomerOrder @relation(fields: [customerOrderId], references: [id])
+
+  @@map("invoices")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  oldData    String?
+  newData    String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
