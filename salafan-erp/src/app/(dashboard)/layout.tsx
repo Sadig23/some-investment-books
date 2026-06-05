@@ -29,6 +29,13 @@ export default async function DashboardLayout({
 
       {/* Mobile bottom nav */}
       <MobileNav role={session.user.role as string} />
+
+      {/* Attribution */}
+      <div className="fixed bottom-2 right-3 z-50 hidden md:block">
+        <span className="text-[10px] text-muted-foreground/40 font-medium tracking-wide select-none hover:text-muted-foreground/70 transition-colors">
+          Created by Sadig Yusifli
+        </span>
+      </div>
     </div>
   )
 }
