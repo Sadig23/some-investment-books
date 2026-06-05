@@ -109,8 +109,9 @@ export function Sidebar({ role }: SidebarProps) {
 
       {/* Footer */}
       {!collapsed && (
-        <div className="border-t border-border p-4">
-          <p className="text-xs text-muted-foreground text-center">Salafan ERP v1.0</p>
+        <div className="border-t border-border p-4 space-y-1">
+          <p className="text-xs text-muted-foreground text-center font-medium">Salafan ERP v1.0</p>
+          <p className="text-[10px] text-muted-foreground/50 text-center">Created by Sadig Yusifli</p>
         </div>
       )}
     </aside>
